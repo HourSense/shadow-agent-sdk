@@ -9,7 +9,15 @@
  * `./src/main.js` using webpack. This gives us some performance wins.
  */
 import { query, type SDKMessage } from '@anthropic-ai/claude-agent-sdk';
-import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  shell,
+  screen,
+  globalShortcut,
+} from 'electron';
 import log from 'electron-log';
 import { autoUpdater } from 'electron-updater';
 import fs from 'fs';
@@ -295,10 +303,24 @@ const createWindow = async () => {
   };
 
   console.log('Creating main window...');
+
+  // Get primary display dimensions
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width: screenWidth, height: screenHeight } =
+    primaryDisplay.workAreaSize;
+  const windowWidth = 480;
+  const windowHeight = 1280;
+
+  // Position window on the right side
+  const x = screenWidth - windowWidth;
+  const y = Math.floor((screenHeight - windowHeight) / 2); // Center vertically
+
   mainWindow = new BrowserWindow({
     show: true, // show immediately for debugging
-    width: 1024,
-    height: 728,
+    width: windowWidth,
+    height: windowHeight,
+    x,
+    y,
     // icon: getAssetPath('icon.png'), // temporarily disabled for debugging
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -335,6 +357,17 @@ const createWindow = async () => {
   // Remove this if your app does not use auto updates
   // eslint-disable-next-line
   new AppUpdater();
+
+  // Register Shift+Space global shortcut to minimize window
+  globalShortcut.register('Shift+Space', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) {
+        mainWindow.restore();
+      } else {
+        mainWindow.minimize();
+      }
+    }
+  });
 };
 
 /**
@@ -342,11 +375,19 @@ const createWindow = async () => {
  */
 
 app.on('window-all-closed', () => {
+  // Unregister all global shortcuts
+  globalShortcut.unregisterAll();
+
   // Respect the OSX convention of having the application in memory even
   // after all windows have been closed
   if (process.platform !== 'darwin') {
     app.quit();
   }
+});
+
+app.on('will-quit', () => {
+  // Unregister all global shortcuts before quitting
+  globalShortcut.unregisterAll();
 });
 
 app
